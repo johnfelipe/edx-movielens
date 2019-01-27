@@ -1,0 +1,639 @@
+---
+title: "Recommendation Systems Notes (copy for ds-capstone-movielens)"
+author: "Amy Gill"
+date: "January 19, 2019"
+output: html_document
+---
+
+---
+title: "Recommendation Systems"
+author: "Amy Gill"
+date: "January 14, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Recommendation systems overview
+
+Recommendation systems use data about user ratings to make specific recommendations to users. Companies that provide many products to many consumers are able to collect massive datasets that can be used to predict whether or not a given user will like a given item. Items with high predicted ratings are then recommended to that user.
+
+Here we discuss the basics of recommendation systems, motivated by approaches taken by the winners of the Netflix challenge. Netflix offered a $1 million prize to the data science community for anyone who could improve the recommendation algorithm by 10%. [Here is an article](http://bits.blogs.nytimes.com/2009/09/21/netflix-awards-1-million-prize-and-starts-a-new-contest/) about the contest, which discusses crowdsourcing and how blending different statistical and machine-learning techniques only works well when combining models that approach the problem differently. [This post](http://blog.echen.me/2011/10/24/winning-the-netflix-prize-a-summary/) describes the winning algorithm construction.
+
+### The Netflix challenge approach
+
+The blog post describes on overview of the techniques. First, a model is proposed. A user's rating is composed of:
+
+* a *baseline rating*, say the mean over all user-movie ratings
+* a *user effect*, accounting fora given user's preference to rate above or below the global average
+* a *movie effect*, accounting for a given movie's average rating relative to the global average
+* a less predictable effect based on the *specific movie-user interaction* - say the effect of genre, actor or theme
+* and more...say, accounting for behavior of similar users
+
+Additional baeline predictors can include:
+* number of days since user's first rating: in the Netflix challenge, there is a factor that varies with the square root of the number of days since first rating - people tend to become harsher critics over time
+* number of days since movie's first rating: movies that are available for longer tend to have slightly lower and more stable ratings because new releases tend to be watched by big fans
+* number of people who have rated the movie - maybe more ratings is a good thing, but it could impact some users in odd ways
+* and more
+
+Modeling these user and movie biases was the most important part. Bell and Koren write in their paper describing the final solution to the Netflix prize:
+
+  "Of the numerous new algorithmic contributions, I would like to highlight one - those humble baseline predictors (or biases), which capture main effects in the data. While the literature mostly concentrates on the more sophisticated algorithmic aspects, we have learned that an accurate treatment of main effects is probably at least as significant as coming up with modeling breakthroughs."
+  
+### Neighborhood models in the Netflix challenge
+
+One standard approach is to use neighborhood models to do collaborative filtering. Briefly, a neighborhood model works as follows. To predict Alice's rating of *Titanic*, you can use:
+
+* **Item-item approach**: find items similar to *Titanic* that Alice has also rated, and take the weighted mean of Alice's ratings on them
+* **User-user approach**: find users similar to Alice who rated *Titanic*, and take the mean of their ratings of *Titanic*
+
+The main questions for the item-item approach are: (1) how to find the set of similar items and (2) how to weight the items when taking weighted mean
+
+The standard approach is to take some similarity metrix (correlation, Jaccard index) to define similarity between pairs of movies. Consider the K most similar movies, where K is determined by cross-validation, and then use the same similarity metric when computing the weighted mean. But there are issues with this approach:
+
+* **Neighbors aren't independent**, so a standard similarity metric to define weighted mean ocercounts direction. Consider that all three Lord of the Rings movies are neighbors of Harry Potter, and counting all three of those is not likely to give much extra information because people are likely to treat all three LotR the same.
+* **Different movies might need different numbers of neighbors** - some movies might be predicted well with only one neighbor (Harry Potter 1 can likely predict Harry Potter 2), some movies may require more, and some movies may have no good neighbors and so their ratings shouldn't be influenced by their neighborhood.
+
+Another approach is:
+
+* use a similarity metric like correlation or cosine similarity to choose the set of similar items - this is the same
+* but instead of using the similarity metric to define weights in the mean calculations, you perform a sparse **linear regression to find weights** that minimize the RMSE between an item's rating and a linear combination of its neighbors' ratings.
+* this means that weights are no longer constrained, so if a movie has no good neighbors then its neighbor-contributed weights will be close to zero and discounted
+
+This describes the item-item approach; a user-user approach that is slightly more complicated is also very useful.
+
+### Implicit data
+
+We can let implicit data influence our predictions. For example, if a user rates lots of sci-fi but no westerns, that user is more likely to like a science fiction than a western. We can define **offset weights** associated with neighbor movies. When we want to rate a movie for a user, we can check if the user has rated each of that movie's nearest neighbors. If so, we add an offset to the prediction to give a bonus to the predicted rating; if not, we add nothing.
+
+### Matrix factorization
+
+Whereas the neighborhood approach takes a local approach to ratings (just compare the most similar movies), **factorization** takes a more global view (compare all movies with similar features) that **decomposes users and movies into latent factors** which we can treat as categories, like "fantasy" and "violence".
+
+The typical way to perform matrix factorization uses **singular value decomposition (SVD)** on the sparse ratings matrix. Some SVD methods used include:
+
+* **Standard SVD**: dot product of Alice's vector and Inception's vector gives Alice's provided rating of Inception
+* **Asymmetric SVD**: instead of users having their own notion of factor vectors, we represent users as a bag of items they have rated or for which they have provided implicit data. Alice is then a (weighted) sum of the factor vectors of the items she has rated, and we can dot product Alice with the factor vector of Titanic to get Alice's rating of Titanic
+* **SVD++**: combine standard and asymmetric SVD
+
+### Regression models
+
+Just as with neighborhood models, we can take a user-centric or movie-centric approach to regression. With a user-centric approach, we learn a regression model for each user, suing all the movies that the user rated as the dataset. The response variable is the movie rating, and the predictor variables are attributes associated to that movie, which can be derived from PCA/MDS/SVD. We can similarly learn a regression model for each movie, using all the users that rated the movie as the dataset.
+
+### Temporal effects
+
+Many models incorporate temporal effects. For example, we can allow a user's rating to depend linearly on the time since a movie's first rating. We can also get more fine-grained temporal effects by binning items into a couple months' of ratings at a time and allowing movie biases to change over time within each bin.  We can also allow user bias to change over time - maybe Bob has recently started a comedy binge and now is more likely to give them high ratings - or give more weight to recent user actions.
+
+### Regularization
+
+Regularization is applied to prevent overfitting. Parameters are estimated using standard shrinkage techniques.
+
+### Ensemble methods
+
+These algorithms were combined to provide a single rating that exploits the strengths of each model. In the Netflix challenge, the winners used **gradient boosted decision trees** to combine over 500 models. Previous solutions used a linear regression to combine the predictors.
+
+Gradient-boosted decision trees work by sequentially fitting a series of decision trees to the data. Each tree is asked to predict the error made by previous trees and is trained on slightly perturbed versions of the data - see random forests. These trees have a built-in ability to apply different methods to different slices of the data. Some predictors that help make useful clusterings:
+
+* number of movies rated per user
+* number of users rating each movie
+* factor vectors of users and movies
+* hidden units of Restricted Boltzmann Machine (not shown here...but apparently RBMs are more useful when the movie or user has a low number of ratings, and matrix factorization methods are more useful when the movie or user has a high number of ratings)
+
+"*However, we would like to stress that it is not necessary to have such a large number of models to do well*. The plot below shows RMSE as a function of the number of methods used. One can achieve our winning score (RMSE=0.8712) with less than 50 methods, using the best 3 methods can yield RMSE < 0.8800, which would land in the top 10. Even just using our single best method puts us on the leaderboard with an RMSE of 0.8890. The lesson here is that having lots of models is useful for the incremental results needed to win competitions, **but practically, excellent systems can be built with just a few well-selected models**."
+
+### The MovieLens dataset
+
+Although Netflix data is proprietary, the GroupLens research lab generated their own database with 20 million + ratings for over 27,000 movies by more than 138,000 users.
+
+A small subset of this dataset is available in `dslabs`.
+
+```{r}
+library(dslabs)
+data("movielens")
+head(movielens)
+```
+```{r}
+summary(movielens)
+```
+
+```{r}
+dim(movielens)
+```
+
+```{r}
+head(movielens)
+```
+
+Each row represents a single rating given by one user to one movie.
+
+This determines the number of unique users and unique movies:
+
+```{r}
+library(tidyverse)
+movielens %>%
+  summarize(n_users = n_distinct(userId),
+            n_movies = n_distinct(movieId))
+```
+
+If we multiply number of users by the number of movies, that number (5 million) far exceeds the number of rows (100000). Our data table is sparse: not every user rated every movie. We could expand our data to this very large matrix format with users on rows and movies on columns with many empty cells with `gather`, but this is a huge operation and could crash R. If we were to build this matrix, you would see that there are many NAs in the table for movies that were not watched or rated. The goal of our system is essentially to fill in the NAs.
+
+The machine learning challenge is more complicated than previous examples int eh course because each outcome has a different set of predictors. To predict movie i for user u, in principle we can use all other ratings for movie i and all other ratings for user u as predictors. In addition, different users rate different movies and different numbers of movies, and some movies have more ratings than others. We can also use information from other movies we have determined are similar to movie i, and other users we determine are similar to user u.
+
+User rate different numbers of movies:
+
+```{r}
+movielens %>% 
+  count(userId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() + 
+  ggtitle("Users")
+```
+And movies have different numbers of ratings:
+
+```{r}
+movielens %>% 
+  count(movieId) %>% 
+  ggplot(aes(n)) + 
+  geom_histogram(bins = 30, color = "black") + 
+  scale_x_log10() + 
+  ggtitle("Movies")
+```
+
+### Building a test set and train set
+
+We need to build an algorithm using the data we collected and apply it to new scenarios. Let's start by building a test set and train set:
+
+```{r}
+library(caret)
+set.seed(755)
+test_index <- createDataPartition(movielens$rating, times = 1, p = 0.2, list = FALSE)
+test_set <- movielens[test_index,]
+train_set <- movielens[-test_index,]
+```
+
+To make sure our algorithm uses for the test set ONLY movies and users that have also appeared in the train set, we use a semi-join to remove exceptions:
+
+```{r}
+test_set <- test_set %>%
+  semi_join(train_set, by = "movieId") %>%
+  semi_join(train_set, by = "userId")
+```
+
+This removes about 670 reviews.
+
+### The loss function
+
+The Netflix challenge used the typical error loss of RMSE on a test set. Let's define RMSE here for this challenge. Given $y_{u,i}$ as the rating for movie $i$ by user $u$ and denote our prediction with $\hat{y}_{u, i}$, the RMSE is defined as:
+
+$$RMSE = \sqrt{\frac{1}{N} \sum_{u,i} (\hat{y}_{u, i} - y_{u,i})^2}$$
+
+Recall that we can interpret RMSE similarly to standard deviation: it is the typical error made when predicting a movie rating. If the number exceeds 1, then the typical error is larger than 1 star - not a great prediction.
+
+Let's write the RMSE function:
+
+```{r}
+RMSE <- function(true_ratings, predicted_ratings){
+    sqrt(mean((true_ratings - predicted_ratings)^2))
+  }
+```
+
+### A first model - base movie rating
+
+The simplest possible recommedation system is to predict the same rating for all movies and all users. This assumes there is a true rating that applies to all users and movies, and that all variation we see is random error. This model looks like:
+
+$$Y_{u,i} = \mu + \epsilon_{u,i}$$
+
+with \epsilon coming from the same distribution centered at 0 and \mu the "true rating" for all movies. We know from theory that the estimate that minimizes the RMSE is the least squares estimate of \mu, which in this case is the average of all ratings:
+
+```{r}
+mu_hat <- mean(train_set$rating)
+mu_hat
+```
+
+If we predict all ratings with $\hat{\mu}$, we obtain the following RMSE:
+
+```{r}
+naive_rmse <- RMSE(test_set$rating, mu_hat)
+naive_rmse
+```
+
+Keep in mind that if you plug in any other value of $\hat{\mu}$, you get a higher value:
+
+```{r}
+RMSE(test_set$rating, 2.5)
+```
+
+The naive algorithm gives a RMSE of 1.05 stars, which is not great. In order to win the $1 million Netflix prize, the RMSE neede to drop to ~ 0.857. Let's find better approaches!
+
+As we go along, we compare different approaches. Let's start by creating a results table with this naive approach:
+
+```{r}
+rmse_results <- data_frame(method = "Just the average", RMSE = naive_rmse)
+rmse_results
+```
+
+### Modeling movie effects
+
+Some movies are higher rated than others. We can augment our previous model by adding a term $b_i$ to represent average ranking for movie $i$:
+
+$$Y_{u,i} = \mu + b_i + \epsilon_{u,i}$$
+
+We use $b$ for *bias* because that terminology was used in the Netflix paper. We can use least squares to estimate the $b_i$:
+
+```{r eval = FALSE}
+moviefit <- lm(rating ~ as.factor(movieId), data = movielens)
+
+```
+
+
+This runs very slowly because there are thousands of $b_i$ to calculate: one for each movie. It may not be a great idea to run this fit.
+
+But in this particular situation, we know that the least square estimate $b_i$ is just the average of $Y_{u,i} - \hat{\mu}$ for each movie $i$. Using `mu` as $\hat{\mu}$, we can compute in this way:
+
+```{r}
+mu <- mean(train_set$rating)
+movie_avgs <- train_set %>%
+  group_by(movieId) %>%
+  summarize(b_i = mean(rating - mu))
+```
+
+These estimates vary substantially:
+
+```{r}
+movie_avgs %>% qplot(b_i, geom ="histogram", bins = 10, data = ., color = I("black"))
+
+```
+
+Recall that $\hat{\mu} = 3.5$, so $b_i = 1.5$ implies a perfect 5-star rating.
+
+Our prediction improves once we add $b_i$ to our model:
+
+```{r}
+predicted_ratings <- mu + test_set %>%
+  left_join(movie_avgs, by = "movieId") %>%
+  .$b_i
+
+model_1_rmse <-RMSE(predicted_ratings, test_set$rating)
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method = "Movie effect model",
+                                     RMSE = model_1_rmse))
+rmse_results %>% knitr::kable()
+```
+
+### Modeling user effects
+
+Let's compute the average rating for user $u$ among users that have over 100 ratings:
+
+```{r}
+train_set %>%
+  group_by(userId) %>%
+  summarize(b_u = mean(rating)) %>%
+  filter(n() >= 100) %>%
+  ggplot(aes(b_u)) +
+  geom_histogram(bins = 30, color = "black")
+```
+
+Note that there is substantial variability among users. A further improvement to our model may incorporate a user effect:
+
+$$Y_{u,i} = \mu + b_i + b_u + \epsilon_{u,i}$$
+
+with $b_u$ the user effect. We could model this with `lm`, though due to the data size it will be slow:
+
+```{r eval=FALSE}
+lm(rating ~ as.factor(movieId) + as.factor(userId))
+```
+
+Instead, we will approximate by computing $\hat{\mu}$ and $\hat{b_i}$, then estimating $\hat{b_u}$ as the average of $y_{u,i} - \hat{\mu} - \hat{b_i}$:
+
+```{r}
+user_avgs <- test_set %>%
+  left_join(movie_avgs, by = "movieId") %>%
+  group_by(userId) %>%
+  summarize(b_u = mean(rating - mu - b_i))
+```
+
+We use this to construct a prediction. This improves our RMSE:
+
+```{r}
+predicted_ratings <- test_set %>%
+  left_join(movie_avgs, by = "movieId") %>%
+  left_join(user_avgs, by = "userId") %>%
+  mutate(pred = mu + b_i + b_u) %>%
+  .$pred
+
+model_2_rmse <- RMSE(predicted_ratings, test_set$rating)
+rmse_results <- bind_rows(rmse_results,
+                          data_frame(method = "Movie + user effects model",
+                                     RMSE = model_2_rmse))
+
+rmse_results %>% knitr::kable()
+```
+
+## Extended investigation of users
+
+While investigating genres (below), I noticed a distinct discretization effect where whole-star ratings are strongly preferred over half-star ratings. Is this effect universal to all users? Are there some users who only rate in whole-star values? 
+```{r}
+train_subset20 <- train_set %>%
+  group_by(userId) %>%
+  filter(n() >= 100, userId <= 75)
+
+train_subset20 %>%
+  ggplot(aes(x=rating)) +
+  geom_histogram(binwidth=0.5) +
+  facet_wrap(~userId, scales = "free")
+
+```
+There appear to be several classes of users by eye:
+
+
+* Those who rate only in whole-star values. This should strongly affect predictions. Users in this class should always have their predictions rounded to the nearest integer. *Examples: 4, 19, 21, ...*
+* Those who rate in whole star values more frequently, but still use half-star values. For this group. it may improve predictions to round to the nearest integer, or narrow the interval around half-star values during rounding to the "nearest" 0.5. *Examples: 15, 75 generally*
+* Those who seem to have no bias for whole-star versus half-star rating, including those with a centered normal-like distribution. *Examples: 17, 22, 23, 26 ...*
+* Those who have an unexpectedly high number of 0.5 relative to 1 ratings, regardless of which class they belong to above. These users seem to punish movies they don't like with the minimum rating rather than giving a full star or better. If users have more 0.5 ratings than 1 ratings, it may be worth downrating movies that are predicted 1s to 0.5.
+
+There may be additional classes beyond what I can see by inspecting only 20 users.
+
+Since these values relate to discretization behavior of users rather than inherent preferences for movies, they should be applied as the very last step of prediction. The predictive algorithm should first generate a numeric value for the prediction, then these user categories should be applied to improve discretization of those predictions based on user preference.
+
+```{r}
+raterType <- train_set %>%
+  group_by(userId) %>%
+  filter(n() >= 100) %>%
+  summarize(halfStarRate = mean(rating %in% c(0.5, 1.5, 2.5, 3.5, 4.5)),
+            wholeStarRate = mean(rating %in% c(1, 2, 3, 4, 5))) %>%
+  mutate(wholeStarOdds = wholeStarRate/halfStarRate,
+         wholeStarOnly = halfStarRate < 0.05,
+         wholeStarPreferred = wholeStarOnly == FALSE & halfStarRate < 0.4,
+         noStarBias = wholeStarOnly == FALSE & wholeStarPreferred == FALSE,
+         raterType = ifelse(wholeStarOnly, "wholeStarOnly",
+                            ifelse(wholeStarPreferred,
+                                   "wholeStarPreferred", "noStarBias"))) %>%
+  select(userId, wholeStarOdds, raterType)
+
+raterType %>%
+  group_by(raterType) %>%
+  count()
+```
+
+To test user-genre preferences, we need to broaden our definition of genre:
+
+```{r}
+train_set %>%
+  filter(userId == 4) %>%
+  group_by(genres) %>%
+  summarize(count = n(), avgRating = mean(rating))
+```
+If we use the genres as provided, they are so specific that the categories often have only 1-2 reviews. However, if we bin on larger categories, like anything that contains "Action", then we have large enough groups that we can make reasonable inferences.
+
+***revisit with other document.
+
+
+
+## Exercises
+
+##### Question 1
+
+*Compute the number of ratings for each movie and then plot it against the year the movie came out. Use square root transformation on the counts. What year has the highest median number of ratings?*
+
+```{r}
+library(tidyverse)
+library(dslabs)
+data("movielens")
+head(movielens)
+```
+
+```{r}
+movieRatingCount <- movielens %>%
+  group_by(movieId) %>%
+  summarize(ratingCount = n(), year = mean(year))
+
+
+movieRatingCount %>%
+  ggplot(aes(x = year, y = ratingCount)) +
+  geom_point() +
+  scale_y_continuous(trans = "sqrt")
+```
+```{r}
+medianRatingsByYear <- movieRatingCount %>%
+  group_by(year) %>%
+  summarize(medianRatingCount = median(ratingCount)) 
+
+medianRatingsByYear[which.max(medianRatingsByYear$medianRatingCount),]
+```
+
+
+##### Question 2
+
+*We see that, on average, movies that came out after 1993 get more ratings. We also see that with newer movies, starting in 1993, the number of ratings decreases with year: the more recent a movie is, the less time users have had to rate it.*
+
+*Among movies that came out in 1993 or later, what are the 25 movies with the most ratings per year? Also report their average rating.*
+
+```{r}
+ratingsPerYear <- movielens %>%
+  filter(year >= 1993) %>%
+  group_by(movieId, title, year) %>%
+  summarize(ratingCount = n(), avgRating = mean(rating)) %>%
+  mutate(ratingsPerYear = ratingCount/(2018-year)) %>%
+  arrange(desc(ratingsPerYear))
+ratingsPerYear
+```
+
+
+
+##### Question 3
+
+*From the table constructed in the previous example, we see that the most rated movies tend to have above average ratings. This is not surprising: more people watch popular movies. To confirm this, stratify the post 1993 movies by ratings per year and compute their average ratings. Make a plot of average rating versus ratings per year and show an estimate of the trend.*
+
+```{r}
+ratingsPerYear %>%
+  mutate(ratingPerYearStrata = round(ratingsPerYear)) %>%
+  group_by(ratingPerYearStrata) %>%
+  summarize(avgRating = mean(avgRating)) %>%
+  ggplot(aes(x = ratingPerYearStrata, y = avgRating)) +
+  geom_point() +
+  geom_smooth()
+```
+
+
+
+##### Question 4
+
+*In the previous exercise, we see that the more a movie is rated, the higher the rating. Suppose you are doing a predictive analysis in which you need to fill in the missing ratings with some value. Which of the following strategies would you use?*
+
+* *Fill in missing values with an average rating of all movies.*
+* *Fill in missing values with 0.*
+* *Fill in the value with a lower value than average since lack of rating is associated with lower ratings. Try out different values and evaluate prediction in a test set.*
+* *None of these.*
+
+##### Question 5
+
+*The dataset also includes a timestamp. This variable represents the time and date at which the rating was provided. Units are in epoch time. Create a new column* `date` *using the* `as_datetime` *function from the* **lubridate** *package.*
+
+```{r}
+library(lubridate)
+movielens <- mutate(movielens, date = as_datetime(timestamp))
+head(movielens)
+```
+
+
+
+##### Question 6
+
+*Compute the average rating for each week and plot this average against day. Use the* `round_date` *function before* `group_by` *to achieve this.*
+
+```{r}
+movielens %>%
+  mutate(week = round_date(date, unit = "week")) %>%
+  group_by(week) %>%
+  summarize(avgRating = mean(rating)) %>%
+  ggplot(aes(x = week, y = avgRating)) +
+  geom_point() + 
+  geom_smooth()
+```
+
+
+
+##### Question 7
+
+*The plot shows some evidence of a time effect. If we define* $d_{u,i}$ *as the day for a user u's rating of movie i, which model is most appropriate?*
+
+$$Y_{u,i} = \mu + b_i + b_u + f(d_{u,i}) + \epsilon_{u,i}$$
+
+where $f(d_{u,i})$ is a smooth function fitting the date to the overall average movie rating at that time and computing the difference relative to the overall average movie rating for all time.
+
+##### Question 8
+
+*The* `movielens` *data also has a *`genres` *column. This column includes every genre that applies ot the movie. Some movies fall under several genres. Define a category as whatever combination appears in this column. Keep categories with over 1,000 ratings. Then compute the average and standard error for each category. Plot as error bar plots.*
+
+I created a data frame `genreRatings` containing the average rating and rating standard deviation for each genre.
+
+```{r}
+# Definition of genreRatings data frame: avgRating and sdRating per genre of popular genres, arranged by avgRating descending
+
+# generate genreRatings by calculating avg and sd of ratings for top genres
+genreRatings <- movielens %>%
+  group_by(genres) %>%
+  mutate(genreCount = n()) %>%
+  filter(genreCount > 1000) %>%  # use only genres with over 1000 ratings
+  summarize(avgRating = mean(rating), sdRating = sd(rating)) %>%
+  arrange(desc(avgRating))  # arrange by descending avgRating (top 1st)
+
+# reorder genres factor by decreasing avgRating
+genreRatings$genres <- droplevels(genreRatings$genres)
+genreRatings$genres <- factor(genreRatings$genres, levels = genreRatings$genres) # order by decreasing avgRating via sorted genreRatings
+
+genreRatings
+
+```
+
+
+```{r}
+genreRatings %>%
+  ggplot(aes(x = genres,
+             y = avgRating,
+             ymin = avgRating - sdRating,
+             ymax = avgRating + sdRating)) +
+  geom_point(size = 3) +
+  geom_errorbar() +
+  xlab("Genres of Movie") +
+  ylab("Rating (Mean +/- SD)") +
+  ggtitle("Average Rating by Genre") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.title = element_text(hjust = 0.5))
+  
+```
+
+
+```{r}
+genreRatingBoxplot <- movielens %>%
+  group_by(genres) %>%
+  mutate(genreCount = n()) %>%
+  filter(genreCount > 1000) %>%
+  left_join(genreRatings) %>%
+  arrange(desc(avgRating))
+
+genreRatingBoxplot$genres <- factor(genreRatingBoxplot$genres, levels = genreRatings$genres)
+
+  
+genreRatingBoxplot %>%
+  ggplot(aes(genres, rating)) +
+  geom_boxplot() +
+  geom_point(aes(y = avgRating, col = "red")) +
+  ggtitle("Boxplot of Ratings by Genre") +
+  theme(axis.text.x = element_text(angle=45, hjust=1),
+        plot.title = element_text(hjust = 0.5))
+```
+
+The boxplot isn't incredibly informative because of the discrete range of values possible. The median values are all either 4 or 3.5. Other quartiles are a bit more informative, but by nature these methods are limited here because quartiles and whiskers must take a half-star or full-star value. Nevertheless, it definitely shows a trend, with some genres having consistently higher ratings and some having narrower ranges than others. Genre has a clear effect on the value of an effective prediction. 
+
+The boxplot also shows that there are only two possible median values per genre: 3.5 or 4. This means our base model, which is likely to begin by predicting 3.5 or 4, is in the right ballpark regardless of genre. For example, there is no standalone genre for which 2 is an appropriate first guess at a rating in the absence of other information.
+
+Adding the average rating (in red) helps to visualize further differences between groups because it is a more flexible non-discretized metric.
+
+How does the distribution of ratings vary among genres?
+
+```{r}
+genreRatingBoxplot %>%
+  ggplot(aes(x = rating)) +
+  geom_histogram(binwidth = 0.5) +
+  facet_wrap(~genres, scales = "free")
+```
+
+For all genres, the most common rating is 4. Depending on genre, the second most common may be 5 or 3 depending on the average strength of the genre.
+
+Notably, there is a large discretization effect with whole-star ratings (1, 2, 3, 4, 5) strongly preferred over neighboring half-star ratings (0.5, 1.5, 2.5, 3.5, 4.5). I wonder if certain users do not use half-star ratings, or if among all raters there is a bias towards whole-star ratings. Regardless, this effect should be taken into account.
+
+##### Question 9
+
+*The plot shows strong evidence of a genre effect. If we define* $g_{u,i}$ *as the genre, what is the most appropriate model?*
+
+$$Y_{u,i} = \mu + b_i + b_u + \sum_{k=1}^K x_{u,i} \beta_k + \varepsilon_{u,i} \mbox{ with } x_{u,i}^k=1 \mbox{ if } g_{u,i} \mbox{ is genre } k$$
+
+
+## Regularization
+
+Regularization can improve our results even more. We discuss how it works.
+
+Note that despite the large variation movie to movie, our improvement in RMSE with including the movie effect was only about 5%. Why wasn't it bigger?
+
+Here are the 10 largest errors we made when only using the movie effects in our models:
+
+```{r}
+test_set %>%
+  left_join(movie_avgs, by = "movieId") %>%
+  mutate(residual = rating - (mu + b_i)) %>%
+  arrange(desc(abs(residual))) %>%
+  select(title, residual) %>%
+  slice(1:10) %>%
+  knitr::kable()
+```
+
+These are all relatively obscure movies and many of them were given large predictions. Why did this happen?
+
+Let's consider the estimate of the movie effect $\hat{b_i}$ and look at the top 10 best and top 10 worst ...
+
+
+
+
+##### copied 1/19/19 before finishing regularization notes and exercises
+
+
+
+
+
+
+
+
+
+
+
+## Notes from the Netflix paper
+
+This is a *collaborative filtering model*. CF models try to capture the interactions between users and items that produce the different rating values. 
+
+The paper is very well written to explain the baseline predictors - user bias and item bias - which contain much of the observed signal.
+
+In their solution, the $b_u$ and $b_i$ calculations are decoupled. First, for each item, the item bias is calculated and regularized. Then, for each user, the user bias is calculated and regularized. The averages were shrunk 

@@ -1,0 +1,132 @@
+---
+title: "Exploratory Data Analysis"
+author: "Amy Gill"
+date: "January 20, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+  - methods/analysis section that explains the process and techniques used, such as data cleaning, data exploration and visualization, any insights gained, and your modeling approach
+
+
+# Exploratory Data Analysis and Modeling Methods
+
+This document performs exploratory data analysis (EDA) on the EdX MovieLens dataset `Rdata/edx.Rdata` generated in `data-download.Rmd`.
+
+## Data import
+
+```{r}
+load("Rdata/edX.Rdata")
+```
+
+## Exploratory Data Analysis
+
+### Overview
+
+```{r}
+dim(edx)
+```
+
+The `edx` dataset contains 9,000,055 observations of each variable.
+
+```{r}
+summary(edx)
+```
+
+The variables consist of `userId`, `movieId`, `rating`, `timestamp`, `title`, and `genres`. There are no missing values in the dataset.
+
+### Rating: The `rating` variable
+
+As the goal of this study is to predict rating based on other features, I first inspect the `rating` variable.
+```{r}
+typeof(edx$rating)
+```
+
+```{r}
+factor(edx$rating) %>% levels()
+```
+
+The rating variable conists of a numeric five-star rating with half-star increments. All ratings in the dataset conform to this pattern. As some operations will work best with numeric values but other will require categorical values, I add the factor-coded rating as a separate variable in `edx` named `ratingFactor`.
+
+```{r}
+edx <- edx %>%
+  mutate(ratingFactor = factor(rating))
+
+head(edx)
+```
+
+```{r}
+summary(edx$rating)
+```
+
+The mean rating is 3.512 and the median rating is 4. The IQR is 1, or 1 star.
+
+```{r}
+edx %>%
+  group_by(rating) %>%
+  summarize(count = n(), probability = count/nrow(edx))
+```
+
+The two most frequent ratings are 4 stars (28.7%) and 3 stars (23.6%). The two least frequent ratings are 0.5 stars (0.9%) and 1.5 stars (1.1%).
+
+
+```{r}
+edx %>%
+  ggplot(aes(x = ratingFactor)) +
+  geom_bar()
+```
+
+There is a clear discretization effect where whole-star ratings are more frequent than half-star ratings. The distribution appears to be skewed to the right.
+
+```{r}
+edx %>%
+  filter(ratingFactor %in% c(1, 2, 3, 4, 5)) %>%
+  ggplot(aes(x = ratingFactor)) +
+  geom_bar()
+```
+```{r}
+edx %>%
+  filter(ratingFactor %in% c(0.5, 1.5, 2.5, 3.5, 4.5)) %>%
+  ggplot(aes(x = ratingFactor)) +
+  geom_bar()
+```
+
+When considering whole-star and half-star ratings independently, they show similar trends suggesting a distribution centered between 3.5 and 4. However, the discretization to whole-star values is distinct and will need to be included in a highly accurate model.
+
+### Users: The `userId` Variable
+
+`userId` encodes a unique integer ID number for each user. As these integers serve only as identifiers and have no numerical meaning, I convert them to factors:
+
+```{r}
+edx <- edx %>%
+  mutate(userId = factor(userId))
+
+length(levels(edx$userId))
+```
+
+There are 69878 unique users in the dataset. The `users` data frame will contain useful reference metrics for each user.
+
+```{r}
+users <- edx %>%
+  group_by(userId) %>%
+  summarize(reviews = n(),
+            avgRating = mean(rating),
+            sdRating = sd(rating),
+            medianRating = median(rating),
+            prob_0.5 = mean(rating == 0.5),
+            prob_1 = mean(rating == 1),
+            prob_1.5 = mean(rating == 1.5),
+            prob_2 = mean(rating == 2),
+            prob_2.5 = mean(rating == 2.5),
+            prob_3 = mean(rating == 3),
+            prob_3.5 = mean(rating == 3.5),
+            prob_4 = mean(rating == 4),
+            prob_4.5 = mean(rating == 4.5),
+            prob_5 = mean(rating == 5))
+
+head(users, 10)
+```
+

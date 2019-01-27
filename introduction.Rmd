@@ -1,0 +1,79 @@
+---
+title: "Introduction"
+author: "Amy Gill"
+date: "January 19, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+Recommendation systems combine knowledge about user behavior and item characteristics to predict user preferences for additional items. These algorithms are commonly employed by companies such as Amazon, Google, Facebook and Netflix to customize recommendations and increase sales or ad revenue. Similar principles can be applied to problems across various disciplines. For example, a recommendation system could take features relating to a patient's cancer and predict which of several treatments is likely to provide the most benefit. In this study, I train a movie recommendation algorithm to accurately predict user star ratings of movies based on other user-submitted reviews.
+
+### Context
+
+This study is part of my capstone project for the HarvardX Data Science Specialization on edX. All work is my own. 
+
+
+*** The GitHub repository for this project is located at: https://github.com/gillsignals/edx-movielens.git.    **
+
+
+
+### The Dataset (rubric: describes the dataset)
+
+This project uses the [10M version of the MovieLens dataset](https://grouplens.org/datasets/movielens/10m/) (Harper F.M. and Konstan J.A., 2015), a stable benchmark dataset of approximately 10 million movie ratings by users of the MovieLens movie recommendation platform. This analysis was performed for the HarvardX Data Science Specialization capstone project, which omitted information on movie tags and extracted a hidden validation set for final grading. The filtered EdX MovieLens dataset used for this project contains 9,000,055 ratings of 10,676 movies by 69,878 users. 
+
+The dataset consists of the following variables:
+
+"userId", "movieId", "rating", "timestamp", "title", "genres"
+
+* `userId`: Unique user ID number. Users were selected for random for inclusion among all users with at least 20 ratings. Users were anonymized and no user metadata is provided.
+* `movieId`: Unique movielens movie ID number.
+* `rating`: User-provided rating. Ratings are made on a 5-star scale with half-star increments.
+* `timestamp`: Time of user-submitted review in epoch time, 
+* `title`: Movie title as identified in [IMDB](http://www.imdb.com), including year of release.
+* `genres`: A pipe-separated list of film genres from a selection of 18 possible genres (Action, Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama, Fantasy, Film-Noir, Horror, Musical, Mystery, Romance, Sci-Fi, Thriller, War, Western).
+
+All predictors were derived from these six variables.
+
+
+
+### Objective (rubric: summarizes goal of the project)
+
+The goal of this project is to build a machine learning algorithm to accurately predict movie ratings in a hidden validation set. The predicted ratings will be submitted for assessment, part of which involves running an automated grading script. The grading script awards points based on *accuracy*, or the likelihood that a predicted star value exactly matches the user rating. This is in contrast to several popular crowdsourced machine learning challenges, such as the Netflix challenge and Kaggle challenges based on "The Movies Dataset", which use distance metrics like RMSE informed by how close the prediction is to tha actual value.  Note that while this task shares many similarities with the Netflix challenge, its reliance on a different metric means that my algorithm should prioritize exactness over minimized distance if given the choice, and different strategies may be fruitful. As my algorithm will be graded on accuracy, I will use accuracy as my metric for developing machine learning algorithms.Therefore, my algorithm will attempt to accurately predict the exact star value rating a user applies to a movie.
+
+
+
+
+
+
+### Approach (rubric: key steps performed (exploratory analysis and data wrangling, )
+
+steps (EDA, data wrangling, model training, generation of predictions for grading.)
+
+
+
+
+
+
+#### Data Download and Initial Processing 
+
+The MovieLens 10M dataset was downloaded from https://grouplens.org/datasets/movielens/10m/ and initially processed by code provided by the course. The course-provided code (included) removed a 10% test set from the initial data. That hidden test set will be used for final grading by the course and will not be used in this analysis. This study uses the remaining 90% of the data, referred to here as the EdX MovieLens dataset or EdX data, for all training and testing. The performance of this model on the grading dataset remains to be seen.
+
+#### Exploratory Data Analysis
+
+
+
+
+
+
+
+- overview of final model
+The final model considers movie effects, user effects, time effects, genre effects. user-time effects, (and user-genre interactions (both comparing individual categories and a kNN model)). (One key insight that advances this model beyond the course community is that this model accounts for discretization of user ratings to whole-star values when such a user bias is present. This improves accuracy beyond models that allow prediction of half-star values when the prediction computation yields such a value but user habits make such a rating unlikely.)
+
+- teaser of final conclusions (accuracy, RMSE)
+
+(The final performance of this algorithm will ultimately be evaluated on the withheld test set on edX)

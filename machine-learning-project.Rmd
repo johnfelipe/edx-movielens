@@ -1,0 +1,211 @@
+---
+title: "MovieLens Project Instructions and Introduction"
+author: "Amy Gill"
+date: "January 10, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project Overview - MovieLens
+
+For this project, I will be creating a movie recommendation system using the MovieLens dataset. This project uses the [10M version of the MovieLens dataset](https://grouplens.org/datasets/movielens/10m/) for stability. (The version of `movielens` included in `dslabs`, which was used for some exercises in *PH125.8: Machine Learning*, is just a subset of this dataset.)
+
+The data will be downloaded and the data will be initially processed by code provided by the course.
+
+There will be a short quiz on the MovieLens data, which is an opportunity to become familiar with the dataset before the project.
+
+Then, I will train a machine learning algorithm using inputs from a training set to predict movie ratings in a validation set. The predicted ratings will be submitted for peer grading, part of which involves running an automated grading script.
+
+```{r}
+```
+
+
+### Starting code: test and validation sets
+```{r}
+#############################################################
+# Create edx set, validation set, and submission file
+#############################################################
+
+# Note: this process could take a couple of minutes
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(caret)) install.packages("caret", repos = "http://cran.us.r-project.org")
+
+# MovieLens 10M dataset:
+# https://grouplens.org/datasets/movielens/10m/
+# http://files.grouplens.org/datasets/movielens/ml-10m.zip
+
+dl <- tempfile()
+download.file("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dl)
+
+ratings <- read.table(text = gsub("::", "\t", readLines(unzip(dl, "ml-10M100K/ratings.dat"))),
+                      col.names = c("userId", "movieId", "rating", "timestamp"))
+
+movies <- str_split_fixed(readLines(unzip(dl, "ml-10M100K/movies.dat")), "\\::", 3)
+colnames(movies) <- c("movieId", "title", "genres")
+movies <- as.data.frame(movies) %>% mutate(movieId = as.numeric(levels(movieId))[movieId],
+                                           title = as.character(title),
+                                           genres = as.character(genres))
+
+movielens <- left_join(ratings, movies, by = "movieId")
+
+# Validation set will be 10% of MovieLens data
+
+set.seed(1)
+test_index <- createDataPartition(y = movielens$rating, times = 1, p = 0.1, list = FALSE)
+edx <- movielens[-test_index,]
+temp <- movielens[test_index,]
+
+# Make sure userId and movieId in validation set are also in edx set
+
+validation <- temp %>% 
+     semi_join(edx, by = "movieId") %>%
+     semi_join(edx, by = "userId")
+
+# Add rows removed from validation set back into edx set
+
+removed <- anti_join(temp, validation)
+edx <- rbind(edx, removed)
+
+# Learners will develop their algorithms on the edx set
+# For grading, learners will run algorithm on validation set to generate ratings
+
+validation <- validation %>% select(-rating)
+
+# Ratings will go into the CSV submission file below:
+
+write.csv(validation %>% select(userId, movieId) %>% mutate(rating = NA),
+          "submission.csv", na = "", row.names=FALSE)
+rm(dl, ratings, movies, test_index, temp, movielens, removed)
+```
+
+```{r}
+dim(edx)
+
+summary(edx)
+```
+
+How many zero ratings were given?
+
+```{r}
+sum(edx$rating == 0)
+```
+
+How many 3 ratings were given?
+
+```{r}
+sum(edx$rating == 3)
+```
+
+How many distinct movies are there?
+
+```{r}
+edx %>%
+  group_by(title) %>%
+  count() %>%
+  nrow()
+```
+
+How many distinct users are there?
+
+```{r}
+edx %>%
+  group_by(userId) %>%
+  count() %>%
+  nrow()
+```
+
+How many movie ratings are in each genre?
+```{r}
+edx %>% group_by(genres) %>% count() %>% arrange(desc(n))
+```
+
+How many movies are in each genre?
+```{r}
+edx %>%
+  group_by(genres) %>%
+  summarize(movieCount = n_distinct(movieId)) %>%
+  arrange(desc(movieCount))
+```
+
+```{r}
+edxGenres <- edx %>%
+  mutate(genreList = strsplit(genres, "|", fixed=TRUE))
+
+head(edxGenres$genreList)
+```
+
+How many movies are in each of the 18 base genres?
+```{r}
+
+```
+Action, Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama, Fantasy, Film-Noir, Horror, Musical, Mystery, Romance, Sci-Fi, Thriller, War, Western
+
+
+
+```{r}
+drama <- edx %>%
+  mutate(drama = str_detect(edx$genres, "Drama"))
+
+drama[drama$drama == "TRUE",]
+```
+
+```{r}
+comedy <- edx %>%
+  mutate(comedy = str_detect(edx$genres, "Comedy"))
+
+comedy[comedy$comedy == "TRUE",]
+```
+
+
+
+```{r}
+thriller <- edx %>%
+  mutate(thriller = str_detect(edx$genres, "Thriller"))
+
+thriller[thriller$thriller == "TRUE",]
+```
+
+```{r}
+romance <- edx %>%
+  mutate(romance = str_detect(edx$genres, "Romance"))
+
+romance[romance$romance == "TRUE",]
+```
+
+What are the five most given ratings, in order from most to least?
+
+```{r}
+edx %>%
+  group_by(rating) %>%
+  count() %>%
+  arrange(desc(n))
+```
+
+### Submission instructions
+
+The submission will consist of 4 files:
+
+* a PDF report
+* a RMD report
+* an R script or RMD file that generates your predicted movie ratings
+* a submission file "submission.csv" with your predicted movie ratings
+
+75% of the grade will be based on the report and script. These will be graded by your peers, based on a rubric defined by the course staff. Each submission will be graded by three peers and the median grade awarded. You must review five peer submissions after submitting your own. When grading, you will run the submission code to confirm that the output correspods to the contents of the submission file "submission.csv". The rubric looks for:
+
+* **files** (15 points): all 4 files in the correct format
+* **report** (25 points):
+  - intro/overview that describes the dataset, summarizes goal of the project, key steps performed
+  - methods/analysis section that explains the process and techniques used, such as data cleaning, data exploration and visualization, any insights gained, and your modeling approach
+  - results section
+  - conclusion section
+  -FOR FULL POINTS: The report includes all required sections and is easy to follow with good supporting detail throughout. (5 points off: difficult to follow or missing supporting detail in one section or minor flaws in multiple sections; 10 points off: all required sections but significantly difficult to follow or missing significant supporting detail in multiple sections; less for missing content)
+* **code** (25 points): should run without errors and be well-commented and easy to follow.
+  -FOR FULL POINTS: runs easily, is consistent with the report, is well-commented (5 points off: runs and is consistent with report but not commented or explained)
+* **submission.csv** (10 points): consistent with output of script
+
+
+25% of the grade will be based on the **accuracy** of your algorithm, graded using an automated grading script. Accuracy lower than 0.50 gets 0/25, accuracy between 0.50 and 0.74 gets 10/25, accuracy between 0.75 and 0.84 gets 15/25, accuracy between 0.85 and 0.94 gets 20/25, and accuracy of 0.95 or greater gets 25/25.

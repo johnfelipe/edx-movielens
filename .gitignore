@@ -5,3 +5,5 @@
 .dat
 ml-10M100K/*
 .Rproj
+RData/*
+.Rproj

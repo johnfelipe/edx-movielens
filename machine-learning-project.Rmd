@@ -17,7 +17,7 @@ The data will be downloaded and the data will be initially processed by code pro
 
 There will be a short quiz on the MovieLens data, which is an opportunity to become familiar with the dataset before the project.
 
-Then, I will train a machine learning algorithm using inputs from a training set to predict movie ratings in a validation set. The predicted ratings will be submitted for peer grading, part of which involves running an automated grading script.
+Then, I will train a machine learning algorithm using inputs from a training set to predict movie ratings in a validation set. The predicted ratings will be submitted for peer grading.
 
 ```{r}
 ```
@@ -70,23 +70,18 @@ validation <- temp %>%
 removed <- anti_join(temp, validation)
 edx <- rbind(edx, removed)
 
-# Learners will develop their algorithms on the edx set
-# For grading, learners will run algorithm on validation set to generate ratings
-
-validation <- validation %>% select(-rating)
-
-# Ratings will go into the CSV submission file below:
-
-write.csv(validation %>% select(userId, movieId) %>% mutate(rating = NA),
-          "submission.csv", na = "", row.names=FALSE)
 rm(dl, ratings, movies, test_index, temp, movielens, removed)
 ```
 
 ```{r}
 dim(edx)
+```
 
+```{r}
 summary(edx)
 ```
+
+
 
 How many zero ratings were given?
 
@@ -138,11 +133,90 @@ edxGenres <- edx %>%
 head(edxGenres$genreList)
 ```
 
-How many movies are in each of the 18 base genres?
-```{r}
+How many movie reviews are in each of the base genres? 
 
+```{r}
+baseGenres <- c("Action", "Adventure", "Animation", "Children", "Comedy", "Crime", "Documentary", "Drama", "Fantasy", "Film-Noir", "IMAX", "Horror", "Musical", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western", "(no genres listed)")
+baseGenres
 ```
-Action, Adventure, Animation, Children's, Comedy, Crime, Documentary, Drama, Fantasy, Film-Noir, Horror, Musical, Mystery, Romance, Sci-Fi, Thriller, War, Western
+
+```{r}
+# initialize genreCount
+genreReviewCount <- vector(mode="list", length = length(baseGenres))
+names(genreReviewCount) <- baseGenres
+for (i in 1:length(genreCount)){
+  genreReviewCount[[i]] = 0
+}
+
+
+# walk through observations and increment genreCount
+for (obs in edxGenres$genreList){
+  for (genre in obs){
+    genreReviewCount[[genre]] <- genreReviewCount[[genre]] + 1
+  }
+}
+
+genreReviewCount
+```
+
+Let's 
+
+```{r}
+edXMovieGenres <- edx %>%
+  group_by(movieId, genres) %>%
+  summarize() %>%
+  mutate(genreList = strsplit(genres, "|", fixed=TRUE)) 
+ miniset <- head(edXMovieGenres)
+ miniset
+```
+
+
+```{r}
+for (genre in baseGenres){
+  count <- 0
+  miniset[[genre]] <- FALSE
+  for (i in 1:nrow(miniset)){
+    if (genre %in% miniset$genreList[[i]]){
+      count <- count + 1
+      miniset[[genre]][i] <- TRUE
+    }
+  }
+  print(paste(toString(genre), "genre contains", toString(count), "movies.", sep = " "))
+}
+
+miniset
+```
+
+```{r}
+for (genre in baseGenres){
+  count <- 0
+  edXMovieGenres[[genre]] <- FALSE
+  for (i in 1:nrow(edXMovieGenres)){
+    if (genre %in% edXMovieGenres$genreList[[i]]){
+      count <- count + 1
+      edXMovieGenres[[genre]][i] <- TRUE
+    }
+  }
+  print(paste(toString(genre), "genre contains", toString(count), "movies.", sep = " "))
+}
+```
+```{r}
+head(edXMovieGenres, 20)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -187,12 +261,13 @@ edx %>%
 
 ### Submission instructions
 
-The submission will consist of 4 files:
+The submission will consist of 3 files:
 
-* a PDF report
+
 * a RMD report
-* an R script or RMD file that generates your predicted movie ratings
-* a submission file "submission.csv" with your predicted movie ratings
+* a PDF report knit from your RMD report
+* an R script or RMD file that generates your predicted movie ratings and calculates RMSE on the validation set
+* (optional) a link to a GitHub repository containing the three files above
 
 75% of the grade will be based on the report and script. These will be graded by your peers, based on a rubric defined by the course staff. Each submission will be graded by three peers and the median grade awarded. You must review five peer submissions after submitting your own. When grading, you will run the submission code to confirm that the output correspods to the contents of the submission file "submission.csv". The rubric looks for:
 
@@ -208,4 +283,4 @@ The submission will consist of 4 files:
 * **submission.csv** (10 points): consistent with output of script
 
 
-25% of the grade will be based on the **accuracy** of your algorithm, graded using an automated grading script. Accuracy lower than 0.50 gets 0/25, accuracy between 0.50 and 0.74 gets 10/25, accuracy between 0.75 and 0.84 gets 15/25, accuracy between 0.85 and 0.94 gets 20/25, and accuracy of 0.95 or greater gets 25/25.
+25% of the grade will be based on the RMSE of your algorithm on the validation set. Accuracy lower than 0.50 gets 0/25, accuracy between 0.50 and 0.74 gets 10/25, accuracy between 0.75 and 0.84 gets 15/25, accuracy between 0.85 and 0.94 gets 20/25, and accuracy of 0.95 or greater gets 25/25.

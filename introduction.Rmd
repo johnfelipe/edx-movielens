@@ -13,12 +13,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Recommendation systems combine knowledge about user behavior and item characteristics to predict user preferences for additional items. These algorithms are commonly employed by companies such as Amazon, Google, Facebook and Netflix to customize recommendations and increase sales or ad revenue. Similar principles can be applied to problems across various disciplines. For example, a recommendation system could take features relating to a patient's cancer and predict which of several treatments is likely to provide the most benefit. In this study, I train a movie recommendation algorithm to accurately predict user star ratings of movies based on other user-submitted reviews.
 
+
+
 ### Context
 
-This study is part of my capstone project for the HarvardX Data Science Specialization on edX. All work is my own. 
-
-
-*** The GitHub repository for this project is located at: https://github.com/gillsignals/edx-movielens.git.    **
+This study is part of my capstone project for the HarvardX Data Science Specialization on edX. All work is my own. The GitHub repository for this project is located at: https://github.com/gillsignals/edx-movielens.git.
 
 
 
@@ -52,7 +51,7 @@ The goal of this project is to build a machine learning algorithm to accurately 
 
 ### Approach (rubric: key steps performed (exploratory analysis and data wrangling, )
 
-steps (EDA, data wrangling, model training, generation of predictions for grading.)
+steps (EDA, generation of training and test sets, data wrangling (before vs after split), model training, generation of predictions for grading.)
 
 
 
@@ -64,6 +63,10 @@ steps (EDA, data wrangling, model training, generation of predictions for gradin
 The MovieLens 10M dataset was downloaded from https://grouplens.org/datasets/movielens/10m/ and initially processed by code provided by the course. The course-provided code (included) removed a 10% test set from the initial data. That hidden test set will be used for final grading by the course and will not be used in this analysis. This study uses the remaining 90% of the data, referred to here as the EdX MovieLens dataset or EdX data, for all training and testing. The performance of this model on the grading dataset remains to be seen.
 
 #### Exploratory Data Analysis
+
+
+
+
 
 
 
